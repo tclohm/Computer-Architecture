@@ -7,7 +7,9 @@ class CPU:
 
     def __init__(self):
         """Construct a new CPU."""
-        pass
+        self.register = [0] * 8
+        self.ram = [0] * 256
+        self.pc = 0
 
     def load(self):
         """Load a program into memory."""
@@ -60,6 +62,46 @@ class CPU:
 
         print()
 
+    def ram_read(self, MAR):
+        # Memory Address Register, holds the memory address we're reading or writing
+        if 0 <= MAR <= 255:
+            return self.ram[MAR]
+        else:
+            return f"{MAR} invalid address"
+
+
+    def ram_write(self, MAR, MDR):
+        # Memory Data Register, holds the value to write or the value just read
+        if 0 <= MAR <= 255:
+            self.ram[MAR] = MDR
+        else:
+            return f"{MAR} invalid address"
+
     def run(self):
         """Run the CPU."""
-        pass
+        halted = False
+        # halted instruction
+        HLT = 0b00000001 # 1 bytes
+        # Set the value of a register to an integer. Load Immediately
+        LDI = 0b10000010 # 130 bytes
+        # Print numeric value stored in the given register.
+        PRN = 0b01000111 # 71 bytes
+
+        while not halted:
+            # Instruction Register, contains a copy of the currently executing instruction
+            IR = self.ram[self.pc]
+            if IR == HLT:
+                print("Halting program")
+                halted = True
+                print("Halted")
+            elif IR == LDI:
+                address = self.ram_read(self.pc + 1)
+                value = self.ram_read(self.pc + 2)
+                self.register[address] = value
+                self.pc = self.pc + 3
+            elif IR == PRN:
+                address = self.ram_read(self.pc + 1)
+                print(self.register[address])
+                self.pc = self.pc + 2
+            else:
+                print(f"Cannot read instruction, {IR} at address {self.pc}")
