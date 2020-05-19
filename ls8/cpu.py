@@ -2,6 +2,15 @@
 
 import sys
 
+# halted instruction
+HLT = 0b00000001 # 1 bytes
+# Set the value of a register to an integer. Load Immediately
+LDI = 0b10000010 # 130 bytes
+# Print numeric value stored in the given register.
+PRN = 0b01000111 # 71 bytes
+# Multiply the values in two registers together and store the result in registerA.
+MUL = 0b10100010
+
 class CPU:
     """Main CPU class."""
 
@@ -10,6 +19,14 @@ class CPU:
         self.register = [0] * 8
         self.ram = [0] * 256
         self.pc = 0
+        # dictionary of functions that can be indexed by opcode value
+        # fetch the instruction in RAM, use that value to look up the handler function in tha branch table
+        # then call it
+        self.dispatch_table = {}
+        self.dispatch_table[LDI] = self.ldi
+        self.dispatch_table[PRN] = self.prn
+        self.dispatch_table[MUL] = self.mul
+
 
     def load(self, file):
         """Load a program into memory."""
@@ -53,8 +70,10 @@ class CPU:
         """ALU operations."""
 
         if op == "ADD":
-            self.reg[reg_a] += self.reg[reg_b]
+            self.register[reg_a] += self.register[reg_b]
         #elif op == "SUB": etc
+        elif op == "MUL":
+            self.register[reg_a] *= self.register[reg_b]
         else:
             raise Exception("Unsupported ALU operation")
 
@@ -93,38 +112,33 @@ class CPU:
         else:
             return f"{MAR} invalid address"
 
+    def ldi(self, operand_a=None, operand_b=None):
+        self.register[operand_a] = operand_b
+
+    def prn(self, operand_a=None, operand_b=None):
+        print(self.register[operand_a])
+
+    def mul(self, operand_a=None, operand_b=None):
+        self.alu("MUL", operand_a, operand_b)
+
     def run(self):
         """Run the CPU."""
         halted = False
-        # halted instruction
-        HLT = 0b00000001 # 1 bytes
-        # Set the value of a register to an integer. Load Immediately
-        LDI = 0b10000010 # 130 bytes
-        # Print numeric value stored in the given register.
-        PRN = 0b01000111 # 71 bytes
-        # Multiply the values in two registers together and store the result in registerA.
-        MUL = 0b10100010
 
         while not halted:
             # Instruction Register, contains a copy of the currently executing instruction
-            IR = self.ram[self.pc]
+            IR = self.ram_read(self.pc)
+
+            operand_a = self.ram_read(self.pc + 1)
+            operand_b = self.ram_read(self.pc + 2)
+
             if IR == HLT:
                 halted = True
                 print("🧮 Program Halted")
-            elif IR == LDI:
-                operand_a = self.ram_read(self.pc + 1)
-                operand_b = self.ram_read(self.pc + 2)
-                self.register[operand_a] = operand_b
-                self.pc = self.pc + 3
-            elif IR == MUL:
-                number_one = self.ram_read(self.pc + 1)
-                number_two = self.ram_read(self.pc + 2)
-                self.register[number_one] = self.register[number_one] * self.register[number_two]
-                self.pc += 3
-            elif IR == PRN:
-                operand_a = self.ram_read(self.pc + 1)
-                print(self.register[operand_a])
-                self.pc = self.pc + 2
+            elif IR in self.dispatch_table:
+                self.dispatch_table[IR](operand_a, operand_b)
+                # shift the instruction register right shift by 6, add 1
+                self.pc += (IR >> 6) + 1
             else:
-                print(f"Cannot read instruction, {IR} at address {self.pc}")
+                print(f"Cannot read instruction, \033[1m{IR}\033[0m at address \033[1m{self.pc}\033[0m")
                 halted = True
