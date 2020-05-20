@@ -11,6 +11,9 @@ PRN = 0b01000111 # 71 bytes
 # Multiply the values in two registers together and store the result in registerA.
 MUL = 0b10100010
 
+PUSH = 0b01000101
+POP = 0b01000110
+
 class CPU:
     """Main CPU class."""
 
@@ -19,6 +22,7 @@ class CPU:
         self.register = [0] * 8
         self.ram = [0] * 256
         self.pc = 0
+        self.sp = 7
         # dictionary of functions that can be indexed by opcode value
         # fetch the instruction in RAM, use that value to look up the handler function in tha branch table
         # then call it
@@ -26,6 +30,8 @@ class CPU:
         self.dispatch_table[LDI] = self.ldi
         self.dispatch_table[PRN] = self.prn
         self.dispatch_table[MUL] = self.mul
+        self.dispatch_table[PUSH] = self.push
+        self.dispatch_table[POP] = self.pop
 
 
     def load(self, file):
@@ -112,14 +118,24 @@ class CPU:
         else:
             return f"{MAR} invalid address"
 
-    def ldi(self, operand_a=None, operand_b=None):
-        self.register[operand_a] = operand_b
+    def ldi(self, reg_a=None, reg_b=None):
+        self.register[reg_a] = reg_b
 
-    def prn(self, operand_a=None, operand_b=None):
-        print(self.register[operand_a])
+    def prn(self, reg_a=None, reg_b=None):
+        print(self.register[reg_a])
 
-    def mul(self, operand_a=None, operand_b=None):
-        self.alu("MUL", operand_a, operand_b)
+    def mul(self, reg_a=None, reg_b=None):
+        self.alu("MUL", reg_a, reg_b)
+
+    def push(self, reg_a=None, reg_b=None):
+        self.register[self.sp] += 1
+        value = self.register[reg_a]
+        self.ram_write(self.register[reg_a], self.register[self.sp])
+
+    def pop(self, reg_a=None, reg_b=None):
+        value = self.ram_read(self.register[self.sp])
+        self.register[self.sp] -= 1
+        self.register[reg_a] = value
 
     def run(self):
         """Run the CPU."""
@@ -129,14 +145,14 @@ class CPU:
             # Instruction Register, contains a copy of the currently executing instruction
             IR = self.ram_read(self.pc)
 
-            operand_a = self.ram_read(self.pc + 1)
-            operand_b = self.ram_read(self.pc + 2)
+            reg_a = self.ram_read(self.pc + 1)
+            reg_b = self.ram_read(self.pc + 2)
 
             if IR == HLT:
                 halted = True
                 print("🧮 Program Halted")
             elif IR in self.dispatch_table:
-                self.dispatch_table[IR](operand_a, operand_b)
+                self.dispatch_table[IR](reg_a, reg_b)
                 # shift the instruction register right shift by 6, add 1
                 self.pc += (IR >> 6) + 1
             else:
