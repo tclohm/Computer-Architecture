@@ -13,6 +13,7 @@ MUL = 0b10100010
 
 PUSH = 0b01000101
 POP = 0b01000110
+SP = 7
 
 class CPU:
     """Main CPU class."""
@@ -22,11 +23,14 @@ class CPU:
         self.register = [0] * 8
         self.ram = [0] * 256
         self.pc = 0
-        self.sp = 7
+        self.register[SP] = 0xF4
+        self.halted = True
+        # self.sp = 7
         # dictionary of functions that can be indexed by opcode value
         # fetch the instruction in RAM, use that value to look up the handler function in tha branch table
         # then call it
         self.dispatch_table = {}
+        self.dispatch_table[HLT] = self.hlt
         self.dispatch_table[LDI] = self.ldi
         self.dispatch_table[PRN] = self.prn
         self.dispatch_table[MUL] = self.mul
@@ -118,6 +122,10 @@ class CPU:
         else:
             return f"{MAR} invalid address"
 
+    def hlt(self, *args):
+        self.halted = True
+        print("🧮 Program Halted")
+
     def ldi(self, reg_a=None, reg_b=None):
         self.register[reg_a] = reg_b
 
@@ -128,14 +136,18 @@ class CPU:
         self.alu("MUL", reg_a, reg_b)
 
     def push(self, reg_a=None, reg_b=None):
-        self.register[self.sp] += 1
+        self.register[SP] -= 1
         value = self.register[reg_a]
-        self.ram_write(self.register[reg_a], self.register[self.sp])
+        self.ram_write(self.register[SP], value)
+        
 
     def pop(self, reg_a=None, reg_b=None):
-        value = self.ram_read(self.register[self.sp])
-        self.register[self.sp] -= 1
+        if self.register[SP] == 0xF4:
+            return "Stack is empty"
+        value = self.ram_read(self.register[SP])
         self.register[reg_a] = value
+        self.register[SP] += 1
+        
 
     def run(self):
         """Run the CPU."""
@@ -148,10 +160,7 @@ class CPU:
             reg_a = self.ram_read(self.pc + 1)
             reg_b = self.ram_read(self.pc + 2)
 
-            if IR == HLT:
-                halted = True
-                print("🧮 Program Halted")
-            elif IR in self.dispatch_table:
+            if IR in self.dispatch_table:
                 self.dispatch_table[IR](reg_a, reg_b)
                 # shift the instruction register right shift by 6, add 1
                 self.pc += (IR >> 6) + 1
