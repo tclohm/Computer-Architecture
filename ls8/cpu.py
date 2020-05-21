@@ -10,10 +10,13 @@ LDI = 0b10000010 # 130 bytes
 PRN = 0b01000111 # 71 bytes
 # Multiply the values in two registers together and store the result in registerA.
 MUL = 0b10100010
-
+ADD = 0b10100000
 PUSH = 0b01000101
 POP = 0b01000110
+# Stack Pointer
 SP = 7
+CALL = 0b01010000
+RET = 0b00010001
 
 class CPU:
     """Main CPU class."""
@@ -24,7 +27,7 @@ class CPU:
         self.ram = [0] * 256
         self.pc = 0
         self.register[SP] = 0xF4
-        self.halted = True
+        self.halted = False
         # self.sp = 7
         # dictionary of functions that can be indexed by opcode value
         # fetch the instruction in RAM, use that value to look up the handler function in tha branch table
@@ -33,9 +36,13 @@ class CPU:
         self.dispatch_table[HLT] = self.hlt
         self.dispatch_table[LDI] = self.ldi
         self.dispatch_table[PRN] = self.prn
+        self.dispatch_table[ADD] = self.add
         self.dispatch_table[MUL] = self.mul
         self.dispatch_table[PUSH] = self.push
         self.dispatch_table[POP] = self.pop
+        self.dispatch_table[CALL] = self.call
+        self.dispatch_table[RET] = self.ret
+        
 
 
     def load(self, file):
@@ -132,6 +139,9 @@ class CPU:
     def prn(self, reg_a=None, reg_b=None):
         print(self.register[reg_a])
 
+    def add(self, reg_a=None, reg_b=None):
+        self.alu("ADD", reg_a, reg_b)
+
     def mul(self, reg_a=None, reg_b=None):
         self.alu("MUL", reg_a, reg_b)
 
@@ -147,23 +157,41 @@ class CPU:
         value = self.ram_read(self.register[SP])
         self.register[reg_a] = value
         self.register[SP] += 1
+
+    def ret(self):
+        return_address = self.register[SP]
+        self.pc = self.ram_read(return_address)
+        self.register[SP] += 1
+
+    def call(self, reg_a):
+        # Call a subroutine at address stored in register
+        # push address of instruction after call onto stack
+        # decrement the stack pointer
+        self.register[SP] -= 1
+        self.ram_write(self.register[SP], self.pc + 2)
+        self.pc = self.register[reg_a]
+
+    
         
 
     def run(self):
         """Run the CPU."""
-        halted = False
 
-        while not halted:
+        while not self.halted:
             # Instruction Register, contains a copy of the currently executing instruction
             IR = self.ram_read(self.pc)
 
             reg_a = self.ram_read(self.pc + 1)
             reg_b = self.ram_read(self.pc + 2)
 
-            if IR in self.dispatch_table:
+            if IR == RET:
+                self.dispatch_table[IR]()
+            elif IR == CALL:
+                self.dispatch_table[IR](reg_a)
+            elif IR in self.dispatch_table:
                 self.dispatch_table[IR](reg_a, reg_b)
                 # shift the instruction register right shift by 6, add 1
                 self.pc += (IR >> 6) + 1
             else:
-                print(f"Cannot read instruction, \033[1m{IR}\033[0m at address \033[1m{self.pc}\033[0m")
-                halted = True
+                print(f"Cannot read instruction, \033[1m{IR}\033[0m, at address \033[1m{self.pc}\033[0m")
+                self.halted = True
