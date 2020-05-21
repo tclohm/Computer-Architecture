@@ -5,7 +5,10 @@
 import sys
 from cpu import *
 
-cpu = CPU()
-
-cpu.load()
-cpu.run()
+try:
+ 	file = sys.argv[1]
+ 	cpu = CPU()
+ 	cpu.load(file)
+ 	cpu.run()
+except:
+	print("🏃‍♀️📄 \033[91m" + "Please run with a file" + "\033[0m")
